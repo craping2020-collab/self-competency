@@ -18,3 +18,9 @@ header{position:sticky;top:0;z-index:2;height:70px;padding-inline:36px;backgroun
 .share-option small{display:block;margin-top:3px;color:var(--muted);font-size:12px}
 .card details>summary{cursor:pointer;color:var(--green);font-weight:700;margin-top:8px}
 .report-table select{min-width:104px;margin:0}.report-table button{margin-bottom:3px}
+@property --trace-angle{syntax:"<angle>";initial-value:0deg;inherits:false}
+.current-card{position:relative;border-color:#8ca9bf}
+.current-card::after{content:"";position:absolute;inset:-1px;padding:1px;border-radius:inherit;pointer-events:none;background:conic-gradient(from var(--trace-angle),transparent 0 77%,#6387a6 85%,#355d81 90%,transparent 98%);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;animation:trace-card 4s linear infinite}
+@keyframes trace-card{to{--trace-angle:360deg}}
+@media(prefers-reduced-motion:reduce){.current-card::after{display:none}}
+@media print{.current-card::after{display:none}}

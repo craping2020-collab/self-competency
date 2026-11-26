@@ -41,6 +41,8 @@ function admin() {
  const r=round(), rows=r.people;
  const isOpen=openedRound===r.id;
  const hasResults=rows.some(p=>p.record.notified);
+ const activeCard=!isOpen?"round":!rows.length?"person":rows.some(p=>!p.rater)||!hasResults?"progress":"results";
+ const box=id=>'card'+(id===activeCard?" current-card":"");
  const schools=[...new Set(rows.map(p=>p.school))];
  const schoolRows=schools.map(s=>{
   const group=rows.filter(p=>p.school===s);
@@ -52,18 +54,18 @@ function admin() {
   }).join("")];
  });
  return hero("운영 관리","회차를 개설하고, 교원과 평가자를 등록해 진행 상황을 확인하세요.")+
- '<section class="card"><h2>진단 회차</h2><label class="block">현재 회차<select id="active-round">'+roster.rounds.map(x=>'<option value="'+x.id+'"'+(x.id===r.id?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>'+
+ '<section class="'+box("round")+'"><h2>진단 회차</h2><label class="block">현재 회차<select id="active-round">'+roster.rounds.map(x=>'<option value="'+x.id+'"'+(x.id===r.id?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>'+
  '<p class="muted">'+(r.close?"응답 마감 "+esc(r.close)+" · ":"")+'문항 버전 v4</p>'+
  (!isOpen?'<div class="actions"><button class="primary" data-action="open-round">이 회차 열기</button></div>':"")+
  '<details><summary>새 회차 개설</summary><form id="add-round"><div class="fields">'+input("회차 이름","name")+input("응답 마감일","close","date")+'</div><div class="actions"><button class="primary">회차 개설</button></div></form></details></section>'+
- (!isOpen?"":'<section class="card"><h2>진단대상 등록</h2><form id="add-person"><div class="fields">'+input("교원 이름 또는 표시명","name")+input("소속 스쿨","school")+'</div><div class="actions"><button class="primary">대상자 등록</button></div></form></section>')+
- (!isOpen||!rows.length?"":'<section class="card"><h2>대상자별 진행 현황 <span class="pill">'+rows.length+'명 · 미배정 '+rows.filter(p=>!p.rater).length+'명</span></h2>'+
+ (!isOpen?"":'<section class="'+box("person")+'"><h2>진단대상 등록</h2><form id="add-person"><div class="fields">'+input("교원 이름 또는 표시명","name")+input("소속 스쿨","school")+'</div><div class="actions"><button class="primary">대상자 등록</button></div></form></section>')+
+ (!isOpen||!rows.length?"":'<section class="'+box("progress")+'"><h2>대상자별 진행 현황 <span class="pill">'+rows.length+'명 · 미배정 '+rows.filter(p=>!p.rater).length+'명</span></h2>'+
  '<details'+(roster.evaluators.length?"":" open")+'><summary>평가자 등록</summary><form id="add-rater">'+input("평가자 이름 또는 표시명","name")+'<div class="actions"><button class="primary">평가자 등록</button></div></form><p class="muted">'+esc(roster.evaluators.map(x=>x.name).join(" · ")||"등록된 평가자가 없습니다.")+'</p></details>'+
  table(["진단대상","스쿨","지정 평가자","진행 상태","화면 열기"],rows.map(p=>[
   esc(p.name),esc(p.school),'<select aria-label="'+esc(p.name)+' 평가자 배정" data-assign="'+p.id+'"><option value="">미배정</option>'+roster.evaluators.map(e=>'<option value="'+e.id+'"'+(e.id===p.rater?" selected":"")+'>'+esc(e.name)+'</option>').join("")+'</select>',
   '<span class="pill">'+statusOf(p.record)+'</span>','<button class="quiet" data-open="'+p.id+'">교원 화면</button> <button class="quiet" data-open="'+p.id+'" data-view="1" '+(p.rater&&p.record.submitted?"":"disabled")+'>평가 화면</button>'
  ]))+'</section>')+
- (isOpen&&hasResults?'<section class="card"><h2>스쿨별 평가 집계</h2><p class="muted">통보된 평가 기준. 괄호 안은 1~5단계 인원수이며 재검토 판정을 반영합니다.</p><details><summary>문항별 집계 보기</summary>'+
+ (isOpen&&hasResults?'<section class="'+box("results")+'"><h2>스쿨별 평가 집계</h2><p class="muted">통보된 평가 기준. 괄호 안은 1~5단계 인원수이며 재검토 판정을 반영합니다.</p><details><summary>문항별 집계 보기</summary>'+
  table(["스쿨","대상","통보","문항별 결과"],schoolRows)+'</details></section>':"");
 }
 function handleAdminForm(form) {
@@ -87,7 +89,7 @@ function handleAdminForm(form) {
 }
 function supplementForms() {
  return questions.filter(q=>resultOf(state,q.id).level==="hold").map(q=>
- '<details class="scale"><summary>문항 '+q.id+' · 확인 보류 보완</summary><p>'+esc(q.title)+'</p>'+
+ '<details class="scale current-card"><summary>문항 '+q.id+' · 확인 보류 보완</summary><p>'+esc(q.title)+'</p>'+
  '<form data-supplement="'+q.id+'">'+field("교원 보완 자료",state.supplements?.[q.id],'name="detail" required')+
  '<div class="actions"><button class="quiet">보완 저장</button></div></form>'+
  (state.supplements?.[q.id]?'<form data-recheck="'+q.id+'">'+select("평가자 재판정", [...numbers,"role","chance"],"",'name="level" required')+
