@@ -12,3 +12,9 @@ header{position:sticky;top:0;z-index:2;height:70px;padding-inline:36px;backgroun
 .primary{background:#2b485f;border-color:#2b485f}.quiet{border-color:#dce3eb;color:#40556b}.toast{background:#203750}select,textarea,input:not([type=checkbox]){border-color:#d7e0e8}.skip{position:fixed;top:-80px;left:16px;background:#203750;color:white;padding:10px;z-index:5}.skip:focus{top:8px}
 @media(max-width:860px){.shell{grid-template-columns:1fr}aside{height:auto;position:static;padding:12px 15px}.workspace-label{display:none}.brand{padding-bottom:10px}.nav{font-size:12px;min-height:34px}header,.content{padding-inline:15px}.domain-list{grid-template-columns:repeat(3,minmax(0,1fr))}.panel{padding:8px}.hero h1{font-size:24px}.card{padding:15px}}
 @media print{aside,header,.actions,.toast,.skip,.count{display:none!important}.shell{display:block}.content{padding:0;max-width:none}.card{break-inside:avoid;box-shadow:none}.hero{margin-bottom:10px}}
+.selection-notes{margin-top:10px;padding:3px 12px;background:#f6f8fb;border-radius:8px;color:#40556b;font-size:13px}
+.share-option{display:flex;align-items:flex-start;gap:10px;margin-top:12px;padding:12px;border:1px solid #b9cdde;border-radius:9px;background:#edf4fa;color:#263e58;cursor:pointer}
+.share-option input{height:17px;width:17px;accent-color:#345676;flex:none}
+.share-option small{display:block;margin-top:3px;color:var(--muted);font-size:12px}
+.card details>summary{cursor:pointer;color:var(--green);font-weight:700;margin-top:8px}
+.report-table select{min-width:104px;margin:0}.report-table button{margin-bottom:3px}
