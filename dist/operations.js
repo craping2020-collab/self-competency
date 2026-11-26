@@ -8,6 +8,7 @@ function loadRoster() {
  };
 }
 let roster = loadRoster();
+let openedRound = null;
 const round = () => roster.rounds.find(r=>r.id===roster.round);
 const person = () => round().people.find(p=>p.id===roster.active);
 state = person()?.record || fresh();
@@ -38,6 +39,8 @@ function resultOf(r,id) {
 const input = (label,name,type="text")=>'<label class="block">'+label+'<input required maxlength="80" type="'+type+'" name="'+name+'"></label>';
 function admin() {
  const r=round(), rows=r.people;
+ const isOpen=openedRound===r.id;
+ const hasResults=rows.some(p=>p.record.notified);
  const schools=[...new Set(rows.map(p=>p.school))];
  const schoolRows=schools.map(s=>{
   const group=rows.filter(p=>p.school===s);
@@ -50,16 +53,18 @@ function admin() {
  });
  return hero("운영 관리","회차를 개설하고, 교원과 평가자를 등록해 진행 상황을 확인하세요.")+
  '<section class="card"><h2>진단 회차</h2><label class="block">현재 회차<select id="active-round">'+roster.rounds.map(x=>'<option value="'+x.id+'"'+(x.id===r.id?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select></label>'+
- '<p class="muted">'+(r.close?"응답 마감 "+esc(r.close)+" · ":"")+'문항 버전 v4</p><details><summary>새 회차 개설</summary><form id="add-round"><div class="fields">'+input("회차 이름","name")+input("응답 마감일","close","date")+'</div><div class="actions"><button class="primary">회차 개설</button></div></form></details></section>'+
- '<div class="fields"><section class="card"><h2>진단대상 등록</h2><form id="add-person">'+input("교원 이름 또는 표시명","name")+input("소속 스쿨","school")+'<div class="actions"><button class="primary">대상자 등록</button></div></form></section>'+
- '<section class="card"><h2>평가자 등록</h2><form id="add-rater">'+input("평가자 이름 또는 표시명","name")+'<div class="actions"><button class="primary">평가자 등록</button></div></form><p class="muted">'+esc(roster.evaluators.map(x=>x.name).join(" · ")||"등록된 평가자가 없습니다.")+'</p></section></div>'+
- '<section class="card"><h2>대상자별 진행 현황 <span class="pill">'+rows.length+'명 · 미배정 '+rows.filter(p=>!p.rater).length+'명</span></h2>'+
- (rows.length?table(["진단대상","스쿨","지정 평가자","진행 상태","화면 열기"],rows.map(p=>[
+ '<p class="muted">'+(r.close?"응답 마감 "+esc(r.close)+" · ":"")+'문항 버전 v4</p>'+
+ (!isOpen?'<div class="actions"><button class="primary" data-action="open-round">이 회차 열기</button></div>':"")+
+ '<details><summary>새 회차 개설</summary><form id="add-round"><div class="fields">'+input("회차 이름","name")+input("응답 마감일","close","date")+'</div><div class="actions"><button class="primary">회차 개설</button></div></form></details></section>'+
+ (!isOpen?"":'<section class="card"><h2>진단대상 등록</h2><form id="add-person"><div class="fields">'+input("교원 이름 또는 표시명","name")+input("소속 스쿨","school")+'</div><div class="actions"><button class="primary">대상자 등록</button></div></form></section>')+
+ (!isOpen||!rows.length?"":'<section class="card"><h2>대상자별 진행 현황 <span class="pill">'+rows.length+'명 · 미배정 '+rows.filter(p=>!p.rater).length+'명</span></h2>'+
+ '<details'+(roster.evaluators.length?"":" open")+'><summary>평가자 등록</summary><form id="add-rater">'+input("평가자 이름 또는 표시명","name")+'<div class="actions"><button class="primary">평가자 등록</button></div></form><p class="muted">'+esc(roster.evaluators.map(x=>x.name).join(" · ")||"등록된 평가자가 없습니다.")+'</p></details>'+
+ table(["진단대상","스쿨","지정 평가자","진행 상태","화면 열기"],rows.map(p=>[
   esc(p.name),esc(p.school),'<select aria-label="'+esc(p.name)+' 평가자 배정" data-assign="'+p.id+'"><option value="">미배정</option>'+roster.evaluators.map(e=>'<option value="'+e.id+'"'+(e.id===p.rater?" selected":"")+'>'+esc(e.name)+'</option>').join("")+'</select>',
   '<span class="pill">'+statusOf(p.record)+'</span>','<button class="quiet" data-open="'+p.id+'">교원 화면</button> <button class="quiet" data-open="'+p.id+'" data-view="1" '+(p.rater&&p.record.submitted?"":"disabled")+'>평가 화면</button>'
- ])):'<p class="muted">등록된 진단대상이 없습니다.</p>')+'</section>'+
- '<section class="card"><h2>스쿨별 평가 집계</h2><p class="muted">통보된 평가 기준. 괄호 안은 1~5단계 인원수이며 재검토 판정을 반영합니다.</p><details><summary>문항별 집계 보기</summary>'+
- (schoolRows.length?table(["스쿨","대상","통보","문항별 결과"],schoolRows):'<p>집계할 교원이 없습니다.</p>')+'</details></section>';
+ ]))+'</section>')+
+ (isOpen&&hasResults?'<section class="card"><h2>스쿨별 평가 집계</h2><p class="muted">통보된 평가 기준. 괄호 안은 1~5단계 인원수이며 재검토 판정을 반영합니다.</p><details><summary>문항별 집계 보기</summary>'+
+ table(["스쿨","대상","통보","문항별 결과"],schoolRows)+'</details></section>':"");
 }
 function handleAdminForm(form) {
  if(!["add-round","add-person","add-rater"].includes(form.id))return false;
@@ -69,6 +74,7 @@ function handleAdminForm(form) {
  if(form.id==="add-round"){
   roster.rounds.push({id,name,close:f.get("close"),people:[]});
   roster.round=id;
+  openedRound=id;
   switchPerson("");
  }else if(form.id==="add-person"){
   const school=f.get("school").trim();

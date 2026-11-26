@@ -92,6 +92,11 @@ document.addEventListener("click",e=>{
   state.submitted=true;save();navigate(0);say("예시 자기진단을 불러왔습니다.");return;
  }
  switch(b.dataset.action){
+ case "open-round":
+  openedRound=round().id;
+  render();
+  document.querySelector('#add-person input')?.focus();
+  return;
  case "form":report=false;break;
  case "report":report=true;break;
  case "print":window.print();return;
@@ -119,7 +124,7 @@ document.addEventListener("click",e=>{
 });
 document.addEventListener("input",e=>{
  const t=e.target,d=t.dataset;
- if(t.id==="active-round"){saveRoster();roster.round=t.value;roster.active="";switchPerson(round().people[0]?.id||"");render();return;}
+ if(t.id==="active-round"){saveRoster();roster.round=t.value;openedRound=null;roster.active="";switchPerson(round().people[0]?.id||"");render();return;}
  if(d.assign){const assigned=round().people.find(p=>p.id===d.assign);assigned.rater=t.value;saveRoster();render();return;}
  if(d.answer&&!state.submitted){const a=state.answers[d.answer]||={};a[d.field]=t.type==="checkbox"?t.checked:t.value;if(d.field==="current"&&(!["3","4"].includes(a.current)))a.sharing=false;}
  else if(d.review&&!state.notified){const r=state.reviews[d.review]||={};r[d.field]=t.value;}
