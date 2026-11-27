@@ -1,1 +1,38 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="전임교원 역량진단 운영안 v4 체험"><title>청강 교원 역량진단</title><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="workspace.css"><script defer src="questions.js"></script><script defer src="app.js"></script><script defer src="operations.js"></script></head><body><a class="skip" href="#content">본문으로 건너뛰기</a><div class="shell"><aside><div class="brand"><span class="mark">청</span><div><b>청강 역량진단</b><small>전임교원 · 운영안 v4</small></div></div><div class="workspace-label"><span></span> 전임교원 진단 파일럿</div><nav aria-label="진단 단계" id="nav"></nav><div class="aside-foot"><b>운영 체험용</b><small>입력 내용은 이 브라우저에 저장됩니다.</small></div></aside><main><header><span>교원 역량진단 <i>/</i> <b id="crumb"></b></span><button id="demo" class="quiet">예시 불러오기</button></header><div class="content" id="content" tabindex="-1"></div><div class="toast" id="toast" role="status"></div></main></div></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="전임교원 역량진단 운영안 v5 체험">
+<title>청강 교원 역량진단</title>
+<link rel="stylesheet" href="theme.css">
+<script defer src="questions.js"></script>
+<script defer src="core.js"></script>
+<script defer src="user.js"></script>
+<script defer src="review.js"></script>
+<script defer src="operations.js"></script>
+<script defer src="app.js"></script>
+</head>
+<body>
+<a class="skip" href="#content">본문으로 건너뛰기</a>
+<div class="shell" id="shell">
+  <aside id="side" aria-label="주 메뉴">
+    <div class="brand"><span class="mark">청</span><div><b>청강 역량진단</b><small>전임교원 · 공통 4수준 목업</small></div></div>
+    <div class="workspace-label"><span></span><em id="who-label">워크스페이스</em></div>
+    <nav aria-label="진단 메뉴" id="nav"></nav>
+    <div class="aside-foot"><b>목업 (체험용)</b><small>입력 내용은 이 브라우저에만 저장되며 인사에 반영되지 않습니다.</small></div>
+  </aside>
+  <button class="scrim" id="scrim" aria-label="메뉴 닫기" hidden></button>
+  <main>
+    <header>
+      <div class="hdr-left"><button id="menu" class="menu-btn" aria-label="메뉴 열기" aria-controls="side" aria-expanded="false" hidden>☰</button><span class="crumb">교원 역량진단 <i>/</i> <b id="crumb"></b></span><span class="mock-tag head-tag">목업 · 시범</span></div>
+      <div class="hdr-right"><select id="viewas" class="viewas" aria-label="보기 전환 (체험용)" hidden></select><span class="role-badge" id="who"></span><button id="pwbtn" class="quiet" data-go="password" hidden>비밀번호 변경</button><button id="switch" class="quiet" data-act="logout" hidden>로그아웃</button></div>
+    </header>
+    <div class="content" id="content" tabindex="-1"></div>
+    <div class="foot">본 서비스는 자기점검과 성장 계획 수립을 돕는 도구입니다. 평가의 최종 판단은 담당자가 합니다.</div>
+    <div class="toast" id="toast" role="status"></div>
+  </main>
+</div>
+<dialog id="dlg" aria-modal="true"></dialog>
+</body>
+</html>

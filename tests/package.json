@@ -1,0 +1,6 @@
+{
+  "name": "cheonggang-diagnosis-mock-tests",
+  "private": true,
+  "scripts": { "test": "node mock-flow.test.js && node admin-assign.test.js && node admin-search.test.js" },
+  "devDependencies": { "jsdom": "^26.0.0" }
+}

@@ -1,196 +1,294 @@
 "use strict";
-const key = "cheonggang-v4-pilot";
-const labels = ["수행 경험 없음", "지원받아 수행", "독립 수행", "상황에 맞춰 조정", "교내 공유·확산"];
-const special = {"role":"역할 해당 없음","chance":"수행 기회 없음","hold":"확인 보류","none":"수행 계획 없음","later":"미정"};
-const stages = ["자기진단", "타인평가", "이의제기·면담", "운영 관리"];
-const domains = [...new Set(questions.map(q => q.domain))];
-const fresh = () => ({answers:{}, reviews:{}, appeals:{}, interview:{}, priorities:[], submitted:false, notified:false, final:false});
-let state = fresh();
-try { state = {...state,...JSON.parse(localStorage.getItem(key) || "{}")}; } catch {}
-let stage = 0, domain = 0, report = false;
-const el = id => document.getElementById(id);
-const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const display = v => special[v] || (labels[Number(v)-1] && v ? v + "단계 · " + labels[Number(v)-1] : "—");
-const answer = q => state.answers[q.id] || {};
-const reviewed = q => state.reviews[q.id] || {};
-const completed = q => answer(q).current && answer(q).target;
-function save() { try { saveRoster(); } catch { say("브라우저 저장을 사용할 수 없습니다."); } }
-let messageTimer;
-function say(s) { el("toast").textContent=s; clearTimeout(messageTimer); messageTimer=setTimeout(()=>el("toast").textContent="",3300); }
-function options(values, value) { return '<option value="">선택</option>'+values.map(v=>'<option value="'+v+'"'+(v===value?' selected':'')+'>'+esc(display(v))+'</option>').join(""); }
-const numbers = ["1","2","3","4","5"];
-function select(label, values, value, data, disabled=false) { return '<label>'+label+'<select '+data+(disabled?" disabled":"")+'>'+options(values,value)+'</select></label>'; }
-function field(label,value,data,disabled=false) { return '<label class="block">'+label+'<textarea '+data+(disabled?" disabled":"")+'>'+esc(value)+'</textarea></label>'; }
-function hero(title,detail,metric,total) { return '<section class="hero"><div><h1>'+title+'</h1><p>'+detail+'</p></div>'+(total?'<div class="count"><strong>'+metric+' / '+total+'</strong><span>완료 문항</span><progress value="'+metric+'" max="'+total+'" aria-label="완료 문항"></progress></div>':'')+'</section>'; }
-function table(head, rows) { return '<div class="scroll"><table class="report-table"><thead><tr>'+head.map(v=>'<th scope="col">'+v+'</th>').join("")+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(v=>'<td>'+v+'</td>').join("")+'</tr>').join("")+'</tbody></table></div>'; }
-const reviewComplete=q=>Boolean(reviewed(q).level&&reviewed(q).reason?.trim());
-const domainComplete=i=>questions.filter(q=>q.domain===domains[i]).every(stage===0?completed:reviewComplete);
-function availableDomain(i) {
- return i<=domain||domains.slice(0,i).every((_,j)=>domainComplete(j));
-}
-function visibleQuestions(isReady) {
- const group=questions.filter(q=>q.domain===domains[domain]);
- const pending=group.findIndex(q=>!isReady(q));
- return pending===-1?group:group.slice(0,pending+1);
-}
-function panel() { return '<section class="card panel"><h2>역량 목록</h2><div class="domain-list">'+domains.map((d,i)=>'<button class="domain '+(domain===i?"active":"")+'" data-domain="'+i+'"'+(availableDomain(i)?"":" disabled")+'>'+d+' <span>'+questions.filter(q=>q.domain===d&&(stage===0?completed(q):reviewed(q).level)).length+'/2</span></button>').join("")+'</div></section>'; }
-function card(q, content, current=false) { return '<article class="card'+(current?" current-card":"")+'"><div class="question-id">'+q.domain+' · 문항 '+String(q.id).padStart(2,"0")+'</div><h3>'+esc(q.title)+'</h3><details class="scale"><summary>5단계 행동기준 보기</summary><ol>'+q.levels.map((v,i)=>'<li><b>'+labels[i]+'</b> · '+esc(v)+'</li>').join("")+'</ol><p class="muted">확인 자료 · '+esc(q.proof)+'</p></details>'+content+'</article>'; }
-function self() {
- if(!person())return hero("자기진단","운영 관리에서 진단대상을 등록하세요.")+'<button class="primary" data-stage="3">운영 관리</button>';
- const count=questions.filter(completed).length;
- if(report) return hero("개인 진단 리포트","문항별 현재 수준과 목표를 살펴보고 개발할 행동을 두 개까지 선택하세요.",count,12)+
- '<section class="card"><h2>나의 진단 결과</h2>'+table(["행동 문항","현재","2년 뒤 목표","개발 우선"],questions.map(q=>[esc(q.domain+" · "+q.title),esc(display(answer(q).current))+(answer(q).sharing?'<br><span class="pill">교내 공유 기회 없었음</span>':""),esc(display(answer(q).target)),'<input type="checkbox" aria-label="'+esc(q.title)+' 개발 우선" data-priority="'+q.id+'" '+(state.priorities.includes(q.id)?"checked":"")+'>']))+'</section>'+
- '<section class="card">'+field("다음에 할 행동과 필요한 지원",state.plan,'data-plan')+'<div class="actions"><button class="quiet" data-action="form">문항 보기</button><button class="quiet" data-action="print">인쇄 / PDF</button></div></section>';
- const visible=visibleQuestions(completed);
- const current=visible.find(q=>!completed(q))?.id;
- const cards=visible.map(q=>{
- const a=answer(q), data=f=>'data-answer="'+q.id+'" data-field="'+f+'"';
- const description = value => q.levels[Number(value)-1];
- const selected = (value, heading) => description(value)?'<p><b>'+heading+'</b> · '+esc(description(value))+'</p>':"";
- const anchors = selected(a.current,"현재 기준")+selected(a.target,"목표 기준");
- const sharing = ["3","4"].includes(a.current)||a.sharing;
- return card(q,'<div class="fields">'+select("현재 수준",[...numbers,"role","chance"],a.current,data("current"),state.submitted)+select("2년 뒤 목표",["2","3","4","5","none","later"],a.target,data("target"),state.submitted)+'</div>'+(anchors?'<div class="selection-notes">'+anchors+'</div>':"")+
- (sharing?'<label class="share-option"><input type="checkbox" '+data("sharing")+' '+(a.sharing?"checked":"")+(state.submitted?" disabled":"")+'><span><strong>(최근 1년 내) 교내 공유 기회 없었음</strong><small>현재 수준을 그대로 기록하고, 공유 기회가 필요했는지 따로 남깁니다.</small></span></label>':"")+
- field("수행 사례와 확인 자료 (선택)",a.evidence,data("evidence"),state.submitted),current===q.id);
- }).join("");
- return hero("자기진단","최근 1년의 실제 행동을 떠올리고, 현재 수준과 2년 뒤 목표를 선택하세요.",count,12)+'<div class="layout"><div>'+cards+'<div class="actions"><button class="quiet" data-action="report">결과 미리보기</button>'+(state.submitted?'<span class="pill">제출 완료</span>':domain<5?'<button class="primary" data-domain="'+(domain+1)+'" data-forward '+(domainComplete(domain)?"":"disabled")+'>다음 역량</button>':'<button class="primary" data-action="submit" '+(count===questions.length?"":"disabled")+'>자기진단 제출</button>')+'</div></div>'+panel()+'</div>';
-}
-function review() {
- if(!person()?.rater) return hero("타인평가","운영 관리에서 이 교원에게 평가자를 배정하세요.")+'<button class="primary" data-stage="3">운영 관리</button>';
- if(!state.submitted) return hero("타인평가","교원이 자기진단을 제출하면 평가를 시작할 수 있습니다.")+'<button class="primary" data-stage="0">자기진단으로</button>';
- const done=questions.filter(q=>reviewed(q).level&&reviewed(q).reason?.trim()).length;
- if(state.notified) {
-  const summary=[...numbers,"role","chance","hold"].map(v=>'<span class="pill">'+esc(display(v))+' · '+questions.filter(q=>resultOf(state,q.id).level===v).length+'건</span>').join("");
-  return hero("평가 결과","1명 체험 데이터의 문항 분포입니다.",done,12)+'<section class="card"><h2>결과 집계</h2><div class="inline-list">'+summary+'</div></section><section class="card"><h2>개인 통보 내역</h2>'+table(["문항","자기진단","평가 확인","목표","판정 사유"],questions.map(q=>[esc(q.domain+" · "+q.title),esc(display(answer(q).current)),esc(display(state.appeals[q.id]?.resolved ? state.appeals[q.id].level : reviewed(q).level)),esc(display(answer(q).target)),esc(resultOf(state,q.id).reason)+(state.supplements?.[q.id]?'<p class="muted">보완: '+esc(state.supplements[q.id])+'</p>':"")]))+supplementForms()+'<div class="actions"><button class="primary" data-stage="2">이의제기·면담으로</button></div></section>';
- }
- const visible=visibleQuestions(q=>reviewed(q).level);
- const current=visible.find(q=>!reviewComplete(q))?.id;
- const cards=visible.map(q=>{
-  const r=reviewed(q), data=f=>'data-review="'+q.id+'" data-field="'+f+'"';
-  return card(q,'<p class="guide"><b>교원이 남긴 사례</b> · '+esc(answer(q).evidence||"입력된 사례 없음")+'</p>'+select("평가 확인 수준",[...numbers,"role","chance","hold"],r.level,data("level"))+field("판정 이유 또는 보완 요청",r.reason,data("reason")),current===q.id);
- }).join("");
- return hero("타인평가","교원이 남긴 사례를 같은 행동기준에 대입해 확인 수준과 이유를 기록하세요.",done,12)+'<div class="layout"><div>'+cards+'<div class="actions">'+(domain<5?'<button class="quiet" data-domain="'+(domain+1)+'" data-forward '+(domainComplete(domain)?"":"disabled")+'>다음 역량</button>':'')+(done===questions.length?'<button class="primary" data-action="notify">결과 통보 처리</button>':"")+'</div></div>'+panel()+'</div>';
-}
-function followup() {
- if(!state.notified) return hero("이의제기·면담","평가 결과가 통보되면 재검토를 요청하고 면담을 기록할 수 있습니다.")+'<button class="primary" data-stage="1">타인평가로</button>';
- const interviewVisible=Boolean(state.interview.open||state.interview.saved||state.interview.action||state.final);
- const entries=Object.entries(state.appeals).map(([id,a])=>{
-  const q=questions.find(x=>x.id===Number(id));
-  return '<article class="card'+(!a.resolved&&!interviewVisible&&Number(id)===Number(Object.keys(state.appeals).find(k=>!state.appeals[k].resolved))?" current-card":"")+'"><h3>'+esc(q.title)+'</h3><p>최초 판정 · '+esc(display(reviewed(q).level))+'</p><p>요청 사유 · '+esc(a.reason)+'</p>'+(a.resolved?'<span class="pill">재검토 완료 · '+esc(display(a.level))+'</span><p>'+esc(a.decision)+'</p>':'<form data-resolve="'+id+'">'+select("재검토 후 확인 수준",[...numbers,"role","chance","hold"],reviewed(q).level,'name="level" required')+field("재검토 이유","",'name="decision" required')+'<div class="actions"><button class="primary">재검토 결과 통보</button></div></form>')+'</article>';
- }).join("");
- const available=questions.filter(q=>!state.appeals[q.id]);
- return hero("이의제기·면담","재검토 요청과 다음 개발 행동을 기록하세요.")+
- '<section class="card'+(!interviewVisible&&!Object.values(state.appeals).some(a=>!a.resolved)?" current-card":"")+'"><h2>이의제기 <span class="pill">'+(state.final?"결과 확정":"통보 완료")+'</span></h2>'+
- (!state.final&&available.length?'<form id="appeal"><label class="block">대상 문항<select name="id" required><option value="">선택</option>'+available.map(q=>'<option value="'+q.id+'">'+q.id+'. '+esc(q.title)+'</option>').join("")+'</select></label>'+field("요청 이유와 보완 근거","",'name="reason" required')+'<div class="actions"><button class="primary">재검토 요청</button></div></form>':'')+
- (!state.final?'<div class="actions"><button class="quiet" data-action="final">평가 확정 처리</button></div>':'')+
- (!interviewVisible?'<div class="actions"><button class="primary" data-action="open-interview">성장 면담 시작</button></div>':"")+'</section>'+entries+
- (interviewVisible?
- '<section class="card'+(state.interview.saved?"":" current-card")+'"><h2>성장 면담기록</h2>'+field("다음 행동",state.interview.action,'data-interview="action"')+field("필요한 지원과 담당자",state.interview.support,'data-interview="support"')+
- '<div class="fields">'+["면담일","점검일"].map((v,i)=>'<label>'+v+'<input type="date" data-interview="'+(i?"check":"date")+'" value="'+esc(state.interview[i?"check":"date"])+'"></label>').join("")+'</div><div class="actions"><button class="primary" data-action="interview">면담기록 저장</button></div></section>':"");
-}
-function render() {
- el("crumb").textContent=(person()?person().name+" · ":"")+stages[stage];
- el("nav").innerHTML=stages.map((s,i)=>'<button data-stage="'+i+'" class="nav '+(i===stage?"active":"")+'" '+(i===stage?'aria-current="step"':'')+'><span>'+(i+1)+'</span><span>'+s+'<small>'+["현재와 목표","확인과 통보","재검토와 발전계획","회차·등록·배정"][i]+'</small></span></button>').join("");
- el("content").innerHTML=[self,review,followup,admin][stage]();
-}
-function navigate(next) { stage=next; domain=0; report=false; render(); window.scrollTo(0,0); }
-document.addEventListener("click",e=>{
- const b=e.target.closest("button"); if(!b)return;
- if(b.dataset.open){switchPerson(b.dataset.open);navigate(Number(b.dataset.view||0));return;}
- if(b.dataset.stage!==undefined){navigate(Number(b.dataset.stage));return;}
- if(b.dataset.domain!==undefined){const next=Number(b.dataset.domain);if(!availableDomain(next))return;domain=next;render();window.scrollTo(0,0);return;}
- if(b.id==="demo"){
-  const id=idFor();
-  let evaluator=roster.evaluators.find(e=>e.id==="sample-rater");
-  if(!evaluator){evaluator={id:"sample-rater",name:"예시 평가자"};roster.evaluators.push(evaluator);}
-  round().people.push({id,name:"예시 교원",school:"예시 스쿨",rater:evaluator.id,record:fresh()});
-  switchPerson(id);
-  for(const q of questions)state.answers[q.id]={current:q.id===11?"chance":q.id%3===0?"2":"3",target:"4",evidence:q.id===6?"지난 학기 과제 지침을 수정하고 학생 의견을 검토했습니다.":"파일럿용 가상 사례"};
-  state.submitted=true;save();navigate(0);say("예시 자기진단을 불러왔습니다.");return;
- }
- switch(b.dataset.action){
- case "open-interview":
-  state.interview.open=true;
-  break;
- case "open-round":
-  openedRound=round().id;
-  render();
-  document.querySelector('#add-person input')?.focus();
-  return;
- case "form":report=false;break;
- case "report":report=true;break;
- case "print":window.print();return;
- case "submit":{
-  const missing=questions.find(q=>!completed(q));
-  if(missing){domain=domains.indexOf(missing.domain);render();say("현재 수준과 목표를 모두 선택하세요.");return;}
-  state.submitted=true;report=true;say("자기진단을 제출했습니다.");break;
- }
- case "notify":{
-  const missing=questions.find(q=>!reviewed(q).level||!reviewed(q).reason?.trim());
-  if(missing){domain=domains.indexOf(missing.domain);render();say("모든 문항의 수준과 판정 이유를 입력하세요.");return;}
-  state.notified=true;say("체험용 개인 결과를 통보 상태로 바꿨습니다.");break;
- }
- case "final":
-  if(questions.some(q=>resultOf(state,q.id).level==="hold")){say("확인 보류 문항의 검토를 먼저 완료하세요.");return;}
-  if(Object.values(state.appeals).some(a=>!a.resolved)){say("접수된 이의제기를 먼저 처리하세요.");return;}
-  state.final=true;say("평가 결과를 확정했습니다.");break;
- case "interview":
-  if(!state.interview.action?.trim()||!state.interview.support?.trim()||!state.interview.date||!state.interview.check){say("다음 행동, 지원과 담당자, 면담일 및 점검일을 입력하세요.");return;}
-  if(state.interview.check<state.interview.date){say("점검일은 면담일 이후로 선택하세요.");return;}
-  state.interview.saved=true;say("면담기록을 저장했습니다.");break;
- default:return;
- }
- save();render();
-});
-document.addEventListener("input",e=>{
- const t=e.target,d=t.dataset;
- if(t.id==="active-round"){saveRoster();roster.round=t.value;openedRound=null;roster.active="";switchPerson(round().people[0]?.id||"");render();return;}
- if(d.assign){const assigned=round().people.find(p=>p.id===d.assign);assigned.rater=t.value;saveRoster();render();return;}
- if(d.answer&&!state.submitted){const a=state.answers[d.answer]||={};a[d.field]=t.type==="checkbox"?t.checked:t.value;if(d.field==="current"&&(!["3","4"].includes(a.current)))a.sharing=false;}
- else if(d.review&&!state.notified){const r=state.reviews[d.review]||={};r[d.field]=t.value;}
- else if(d.interview){state.interview[d.interview]=t.value;state.interview.saved=false;}
- else if(d.plan!==undefined)state.plan=t.value;
- else if(d.priority){
-  const id=Number(d.priority);
-  if(t.checked&&state.priorities.length===2){t.checked=false;say("두 개까지 선택할 수 있습니다.");return;}
-  state.priorities=t.checked?[...state.priorities,id]:state.priorities.filter(x=>x!==id);
- }else return;
- save();
- if(d.review&&d.field==="reason"){
-  const forward=document.querySelector("[data-forward]");
-  if(forward)forward.disabled=!domainComplete(domain);
-  const notify=document.querySelector("[data-action=notify]");
-  if(notify)notify.remove();
-  if(questions.every(reviewComplete)){
-   const next=document.createElement("button");
-   next.className="primary";
-   next.dataset.action="notify";
-   next.textContent="결과 통보 처리";
-   t.closest(".layout").querySelector(".actions").append(next);
+/* 라우터 · 셸(메뉴·헤더) · 이벤트 연결 */
+/* 메뉴는 4개: 자가진단 / 진단결과 / 도움말 / 운영자기능. 세부 화면은 각 메뉴 안의 탭으로 둔다. */
+const OPS = ["home", "progress", "agreement", "members", "rounds", "data", "person"], USER_ROUTES = ["self", "result", "raters", "review"];
+const ROUTES = {
+  admin: {
+    home: ["운영 홈", adminHome], progress: ["진행 현황", progressPage], agreement: ["측정 일치도", agreementPage], members: ["구성원", membersPage], rounds: ["회차 관리", roundsPage], data: ["데이터·기록", dataPage],
+    person: ["대상자 상세", personPage], pilot: ["파일럿 안내", pilotPage], faq: ["자주 묻는 질문", faqPage], password: ["비밀번호 변경", pwPage]
+  },
+  user: {
+    self: ["자가진단", selfPage], result: ["진단결과", resultPage], raters: ["평가 대상자", ratersPage, true], review: ["평가하기", reviewPage, true],
+    pilot: ["파일럿 안내", pilotPage], faq: ["자주 묻는 질문", faqPage], password: ["비밀번호 변경", pwPage]
   }
- }
- if(t.tagName==="SELECT"){
+};
+const NAV4 = [["self", "자가진단", "현재 수준과 목표 입력", "self"], ["result", "진단결과", "결과·이의제기·면담", "result"], ["faq", "도움말", "질문 · 파일럿 안내", "faq"], ["home", "운영자기능", "회차·구성원·진행 현황", "ops"]];
+const sectionOf = n => OPS.includes(n) ? "home" : ["result", "raters", "review"].includes(n) ? "result" : ["faq", "pilot"].includes(n) ? "faq" : n;
+const route = () => { const [name = "home", arg = ""] = location.hash.replace(/^#\/?/, "").split("/"); return { name: name || "home", arg: decodeURIComponent(arg) }; };
+const go = r => { if (location.hash === "#/" + r) { resetUi(); render(); } else location.hash = "#/" + r; };
+const ICONS = {
+  home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
+  self: "M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1zM8 6H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-2M9 14l2 2 4-4",
+  result: "M5 21V11M12 21V4M19 21v-8",
+  pilot: "M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 18l-5-9V3",
+  faq: "M12 17h.01M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z",
+  raters: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM17 11l2 2 4-4",
+  ops: "M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1",
+  progress: "M3 12h4l3 8 4-16 3 8h4",
+  agreement: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
+  members: "M17 21v-2a4 4 0 0 0-3-3.87M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2M16 3.1a4 4 0 0 1 0 7.8",
+  rounds: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+  data: "M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"
+};
+const icon = k => `<span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${ICONS[k] || ICONS.home}"/></svg></span>`;
+function resetUi() { ui.dom = 0; ui.report = false; ui.form = false; ui.openQ = null; ui.fresh = null; }
+let facultyViewId;
+const homeRoute = () => isAdmin() ? "home" : "self";
+const viewFaculty = () => userOf(facultyViewId) || store.users.filter(u => { const e = !u.evaluator && entryOf(u.id); return e && !e.record.submitted; }).sort((x, y) => countSelf(recOf(x.id)) - countSelf(recOf(y.id)))[0] || store.users.find(u => !u.evaluator) || store.users[0];
+
+function loginPage() {
+  const admin = ui.loginMode === "admin";
+  const demo = [];
+  if (checkPw(store.admin, "admin1234")) demo.push(`관리자 <code>${esc(store.admin.loginId)}</code> / <code>admin1234</code>`);
+  store.users.filter(u => checkPw(u, "demo1234")).slice(0, 4).forEach(u => demo.push(`${esc(u.name)}${u.evaluator ? "(평가자)" : ""} <code>${esc(u.loginId)}</code> / <code>demo1234</code>`));
+  return `<div class="entry-wrap narrow"><div class="brand"><span class="mark">청</span><div><b>청강 교원 역량진단</b><small>전임교원 · 운영안 v5</small></div></div>` +
+    `<section class="card login-card"><h1>${admin ? "관리자 로그인" : "로그인"}</h1><p class="muted">${admin ? "회차·구성원·평가자 배정과 진행 현황을 관리합니다." : "ID와 비밀번호를 입력하세요. 평가자로 지정된 교수는 같은 계정으로 평가 메뉴도 함께 열립니다."}</p>` +
+    `<form data-form="login" data-mode="${admin ? "admin" : "user"}" autocomplete="on"><label class="block">${admin ? "관리자 ID" : "ID (사번)"}<input id="login-id" name="id" autocomplete="username" required maxlength="40"></label><label class="block">비밀번호<input name="pw" type="password" autocomplete="current-password" required maxlength="100"></label><p id="login-msg" class="login-msg" role="alert" hidden></p><div class="actions"><button class="primary wide">로그인</button></div></form>` +
+    `<div class="login-alt">${admin ? '<button class="linkish" data-act="login-mode" data-mode="user">← 전임교수 로그인으로</button>' : '<button class="linkish" data-act="login-mode" data-mode="admin">관리자 로그인</button>'}</div></section>` +
+    (demo.length ? `<details class="demo-accounts"><summary>체험용 계정 안내</summary><ul>${demo.map(d => `<li>${d}</li>`).join("")}</ul><p class="muted small">비밀번호를 바꾸면 이 안내에서 사라집니다.</p></details>` : "") +
+    `<p class="muted small">체험 버전입니다. 계정과 입력 내용은 이 브라우저에만 저장되며 실제 보안 로그인이 아닙니다.</p></div>`;
+}
+
+function render() {
+  store = loadStore(); session = readSession();
+  if (!session && SKIP_LOGIN) {
+    const faculty = viewFaculty();
+    setSession(faculty ? { role: "user", uid: faculty.id } : { role: "admin" });
+  }
+  if (session?.role === "user") facultyViewId = session.uid;
+  ui.gates = []; ui.count = null;
+  const shell = el("shell"), content = el("content");
+  const va = el("viewas");
+  va.hidden = !(SKIP_LOGIN && session);
+  if (!va.hidden) {
+    va.innerHTML = `<option value="faculty" ${store.users.length ? "" : "disabled"}>전임교원 보기</option><option value="admin">관리자 보기</option>`;
+    va.value = session.role === "admin" ? "admin" : "faculty";
+  }
+  el("who").hidden = SKIP_LOGIN;
+  el("switch").classList.toggle("gone", SKIP_LOGIN);
+  if (!session) {
+    shell.classList.add("entry"); shell.classList.remove("locked"); closeMenu(true);
+    el("nav").innerHTML = ""; el("crumb").textContent = "로그인"; el("who").textContent = ""; el("switch").hidden = true; el("pwbtn").hidden = true; el("menu").hidden = true;
+    document.title = "로그인 · 청강 교원 역량진단";
+    content.innerHTML = loginPage(); const f = el("login-id"); if (f) f.focus(); return;
+  }
+  shell.classList.remove("entry"); el("switch").hidden = SKIP_LOGIN; el("pwbtn").hidden = SKIP_LOGIN;
+  const kind = session.role === "admin" ? "admin" : "user", u = me();
+  el("who").textContent = kind === "admin" ? "관리자" : "전임교원";
+  if (account().must && !SKIP_LOGIN) {
+    shell.classList.add("locked"); el("menu").hidden = true; el("pwbtn").hidden = true; closeMenu(true);
+    el("nav").innerHTML = ""; el("crumb").textContent = "비밀번호 설정"; content.innerHTML = pwPage(); return;
+  }
+  shell.classList.remove("locked"); el("menu").hidden = false;
+  const HOME = kind === "admin" ? "home" : "self";
+  let { name, arg } = route();
+  if (!location.hash || location.hash === "#" || location.hash === "#/" || (kind === "user" && name === "home" && !SKIP_LOGIN)) name = HOME;
+  /* 로그인 보류(목업) 중에는 메뉴를 눌러 교원 ↔ 운영자 보기를 오갈 수 있다 */
+  if (SKIP_LOGIN && kind === "admin" && USER_ROUTES.includes(name)) { const f = viewFaculty(); if (f) { setSession({ role: "user", uid: f.id }); return render(); } }
+  if (SKIP_LOGIN && kind === "user" && OPS.includes(name)) { setSession({ role: "admin" }); return render(); }
+  let def = ROUTES[kind][name];
+  if (!def || (SKIP_LOGIN && name === "password") || (def[2] === true && !(u && u.evaluator))) { name = HOME; arg = ""; def = ROUTES[kind][HOME]; if (location.hash && location.hash !== "#/" + HOME) history.replaceState(null, "", "#/" + HOME); }
+  const sec = NAV4.find(n => n[0] === sectionOf(name)), active = sec ? sec[0] : "";
+  const items = NAV4.filter(([k]) => SKIP_LOGIN || (kind === "admin" ? k !== "self" && k !== "result" : k !== "home"));
+  el("who-label").textContent = kind === "admin" ? "관리자 워크스페이스" : "전임교원";
+  const crumb = !sec || def[0] === sec[1] ? def[0] : sec[1] + " · " + def[0];
+  el("crumb").textContent = crumb;
+  el("nav").innerHTML = items.map(([k, label, sub, ic]) => `<button data-go="${k}" class="nav ${k === active ? "active" : ""}" ${k === active ? 'aria-current="page"' : ""}>${icon(ic)}<span class="lbl">${label}${sub ? `<small>${sub}</small>` : ""}</span></button>`).join("");
+  document.title = crumb + " · 청강 교원 역량진단";
+  content.innerHTML = (kind === "admin" && OPS.includes(name) ? opsTabs(name) : "") + def[1](arg);
+  refreshGates();
+}
+
+/* ---------- 모바일 메뉴 ---------- */
+const mq = window.matchMedia("(max-width: 860px)");
+function closeMenu(silent) {
+  const side = el("side"); side.classList.remove("open"); el("scrim").hidden = true; el("menu").setAttribute("aria-expanded", "false");
+  if (mq.matches) side.setAttribute("inert", ""); else side.removeAttribute("inert");
+  if (!silent && mq.matches) el("menu").focus();
+}
+function openMenu() { const side = el("side"); side.removeAttribute("inert"); side.classList.add("open"); el("scrim").hidden = false; el("menu").setAttribute("aria-expanded", "true"); const b = side.querySelector("button"); if (b) b.focus(); }
+mq.addEventListener("change", () => closeMenu(true));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && el("side").classList.contains("open")) { e.preventDefault(); closeMenu(); } });
+el("menu").addEventListener("click", () => el("side").classList.contains("open") ? closeMenu() : openMenu());
+el("scrim").addEventListener("click", () => closeMenu());
+
+/* ---------- 로그인 · 로그아웃 ---------- */
+let loginFail = { n: 0, until: 0 };
+Object.assign(ACTIONS, {
+  "login-mode"(t) { ui.loginMode = t.dataset.mode; render(); },
+  logout() { setSession(null); ui.loginMode = "user"; history.replaceState(null, "", location.pathname); resetUi(); render(); window.scrollTo(0, 0); }
+});
+FORMS.login = (f, v) => {
+  const admin = f.dataset.mode === "admin", id = String(v.get("id") || "").trim().toLowerCase(), pw = String(v.get("pw") || "");
+  const wait = Math.ceil((loginFail.until - Date.now()) / 1000);
+  if (wait > 0) { loginMsg(`로그인 시도가 너무 많습니다. ${wait}초 뒤에 다시 시도하세요.`); return; }
+  const acc = admin ? (store.admin.loginId.toLowerCase() === id ? store.admin : null) : store.users.find(u => u.loginId.toLowerCase() === id);
+  if (!acc || !checkPw(acc, pw)) {
+    loginFail.n++; if (loginFail.n >= 5) { loginFail = { n: 0, until: Date.now() + 30000 }; loginMsg("5회 연속 실패했습니다. 30초 뒤에 다시 시도하세요."); return; }
+    loginMsg("ID 또는 비밀번호가 올바르지 않습니다."); return;
+  }
+  loginFail = { n: 0, until: 0 };
+  setSession(admin ? { role: "admin" } : { role: "user", uid: acc.id });
+  mutate(() => logAct("로그인"), false);
+  location.hash = "#/" + homeRoute(); resetUi(); render();
+};
+function loginMsg(t) { const m = el("login-msg"); if (m) { m.textContent = t; m.hidden = false; } const p = $pw(); if (p) { p.value = ""; p.focus(); } }
+const $pw = () => document.querySelector('#content input[name="pw"]');
+
+/* 비밀번호 변경 (최초 로그인·초기화 직후에는 필수) */
+const validPw = p => p.length >= 8 && /[A-Za-z]/.test(p) && /\d/.test(p);
+function pwPage() {
+  const forced = account().must;
+  return `<div class="${forced ? "entry-wrap narrow" : ""}">${hero("비밀번호 변경", forced ? "임시 비밀번호로 로그인했습니다. 새 비밀번호를 설정해야 계속할 수 있습니다." : "새 비밀번호를 설정합니다.")}<section class="card"><form data-form="pw"><label class="block">현재 비밀번호<input type="password" name="cur" autocomplete="current-password" required></label><label class="block">새 비밀번호 <span class="muted small">(8자 이상, 영문+숫자)</span><input type="password" name="next" autocomplete="new-password" required></label><label class="block">새 비밀번호 확인<input type="password" name="again" autocomplete="new-password" required></label><div class="actions"><button class="primary">변경</button>${forced ? '<button type="button" class="quiet" data-act="logout">로그아웃</button>' : ""}</div></form></section></div>`;
+}
+FORMS.pw = (f, v) => {
+  const acc = account(), cur = String(v.get("cur")), next = String(v.get("next")), again = String(v.get("again"));
+  if (!checkPw(acc, cur)) { say("현재 비밀번호가 맞지 않습니다."); return; }
+  if (!validPw(next)) { say("새 비밀번호는 8자 이상이며 영문과 숫자를 모두 포함해야 합니다."); return; }
+  if (next !== again) { say("새 비밀번호 확인이 일치하지 않습니다."); return; }
+  if (next === cur) { say("현재와 다른 비밀번호를 입력하세요."); return; }
+  mutate(() => { const a = account(); a.pw = makePw(next); a.must = false; logAct("비밀번호 변경"); }, false);
+  say("비밀번호를 변경했습니다."); go(homeRoute());
+};
+
+/* ---------- 이벤트 ---------- */
+document.addEventListener("click", async ev => {
+  const t = ev.target.closest("[data-go],[data-act],[data-domain]"); if (!t || t.disabled) return;
+  if (el("side").contains(t) && mq.matches) closeMenu(true);
+  if (t.dataset.go !== undefined) { go(t.dataset.go); return; }
+  if (t.dataset.domain !== undefined) { ui.dom = Number(t.dataset.domain); ui.openQ = null; render(); window.scrollTo(0, 0); return; }
+  const fn = ACTIONS[t.dataset.act]; if (fn) await fn(t);
+});
+document.addEventListener("submit", ev => {
+  const f = ev.target.closest("form[data-form]"); if (!f) return;
+  ev.preventDefault();
+  const fn = FORMS[f.dataset.form]; if (fn) fn(f, new FormData(f));
+});
+window.addEventListener("hashchange", () => { resetUi(); render(); window.scrollTo(0, 0); const c = el("content"); if (c) c.focus({ preventScroll: true }); });
+window.addEventListener("storage", e => {
+  if (e.key !== KEY) return;
+  const a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && el("content").contains(a)) return;
   render();
-  const id=d.answer?"data-answer":"data-review", value=d.answer||d.review;
-  if(value)document.querySelector('select['+id+'="'+value+'"][data-field="'+d.field+'"]')?.focus();
- }
 });
-document.addEventListener("submit",e=>{
- const form=e.target;
- if(handleAdminForm(form)||handleSupplement(form)){e.preventDefault();return;}
- if(form.id!=="appeal"&&!form.dataset.resolve)return;
- e.preventDefault();
- const values=new FormData(form);
- if(form.id==="appeal"){
-  const id=values.get("id"),reason=values.get("reason").trim();
-  if(!reason||state.final||state.appeals[id]){say("대상과 요청 사유를 확인하세요.");return;}
-  state.appeals[id]={reason,resolved:false};
-  say("재검토 요청을 접수했습니다.");
- }else{
-  const id=form.dataset.resolve,decision=values.get("decision").trim();
-  if(!decision||state.final||state.appeals[id].resolved){say("재검토 이유를 확인하세요.");return;}
-  Object.assign(state.appeals[id],{level:values.get("level"),decision,resolved:true});
-  say("재검토 결과를 기록했습니다.");
- }
- save();render();
+
+/* 이름 검색: 한글 조합(IME) 중에는 화면을 다시 그리지 않고, 조합이 끝나면 반영한다 */
+function applySearch(t) {
+  if (t.dataset.q === "progress") ui.filter.q = t.value; else if (t.dataset.q === "assign") ui.assignQ = t.value; else ui.memberQ = t.value;
+  const pos = t.selectionStart; render();
+  const n = document.querySelector('[data-q="' + t.dataset.q + '"]'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch { } }
+}
+document.addEventListener("compositionend", ev => { if (ev.target.dataset && ev.target.dataset.q !== undefined) applySearch(ev.target); });
+
+/* 입력 자동 저장 (모든 쓰기는 권한·상태를 다시 확인한다) */
+document.addEventListener("input", ev => {
+  const t = ev.target, d = t.dataset, isSelect = t.tagName === "SELECT";
+  if (d.q !== undefined) { if (!ev.isComposing) applySearch(t); return; }
+  const val = t.type === "checkbox" ? t.checked : t.value;
+  let handled = false, rerender = isSelect || t.type === "radio";
+  if (d.a !== undefined) {
+    handled = true; ui.openQ = Number(d.a);
+    if (t.type === "radio") ui.fresh = { q: Number(d.a), f: d.f };
+    mutate(() => {
+      const e = session && session.role === "user" ? entryOf(session.uid) : null;
+      if (!e || e.record.submitted || isClosed(round())) return;
+      const a = e.record.answers[d.a] = e.record.answers[d.a] || {};
+      a[d.f] = val;
+      const qq = questions.find(x => x.id === Number(d.a)); if (qq && !e.record.records[qq.id]) pullRecord(e.record, e.uid, qq);
+    }, false);
+  } else if (d.rv !== undefined) {
+    handled = true;
+    mutate(() => { const e = asRater(d.uid); if (!e || !e.record.submitted || e.record.notified) return; const r = e.record.reviews[d.rv] = e.record.reviews[d.rv] || {}; r[d.f] = val; }, false);
+  } else if (d.iv !== undefined) {
+    handled = true; rerender = false;
+    mutate(() => { const e = asRater(d.uid); if (!e || !e.record.notified) return; e.record.interview[d.iv] = val; e.record.interview.saved = false; }, false);
+  } else if (d.support !== undefined) {
+    handled = true; rerender = false;
+    mutate(() => { const e = session && session.role === "user" ? entryOf(session.uid) : null; if (e) { e.record.supports = e.record.supports || {}; e.record.supports[d.support] = val; } }, false);
+    const mk = document.querySelector(`[data-saved="${d.support}"]`);
+    if (mk) { mk.textContent = "✓ 저장됨"; mk.classList.add("on"); clearTimeout(mk._t); mk._t = setTimeout(() => mk.classList.remove("on"), 1600); }
+  } else if (d.priority !== undefined) {
+    handled = true; rerender = false;
+    const id = Number(d.priority);
+    const res = mutate(() => {
+      const e = session && session.role === "user" ? entryOf(session.uid) : null; if (!e) return "";
+      const p = e.record.priorities;
+      if (t.checked && p.length >= 2 && !p.includes(id)) return "limit";
+      e.record.priorities = t.checked ? [...new Set([...p, id])] : p.filter(x => x !== id); return "ok";
+    }, false);
+    if (res === "limit") { t.checked = false; say("두 개까지 선택할 수 있습니다."); }
+    else {
+      const si = document.querySelector(`[data-support="${id}"]`);
+      if (si) { si.disabled = !t.checked; si.placeholder = t.checked ? "예: 연수, 자료, 동료 멘토링" : "개발 우선을 체크하면 입력"; if (t.checked) si.focus(); }
+    }
+  }
+  if (!handled) return;
+  if (rerender) {
+    render();
+    const sel = t.type === "radio" ? `input[data-a="${d.a}"][data-f="${d.f}"][value="${t.value}"]` : d.a !== undefined ? `select[data-a="${d.a}"][data-f="${d.f}"]` : `select[data-rv="${d.rv}"][data-f="${d.f}"]`;
+    const n = document.querySelector(sel); if (n) n.focus({ preventScroll: true });
+  } else refreshGates();
 });
+
+/* 관리자 변경 입력 */
+document.addEventListener("change", async ev => {
+  const t = ev.target, d = t.dataset;
+  if (t.id === "viewas" || t.id === "faculty-view") {
+    const faculty = t.id === "faculty-view" ? userOf(t.value) : viewFaculty();
+    setSession(t.id === "viewas" && t.value === "admin" || !faculty ? { role: "admin" } : { role: "user", uid: faculty.id });
+    location.hash = "#/" + homeRoute(); resetUi(); render(); window.scrollTo(0, 0); return;
+  }
+  if (d.upload !== undefined && t.type === "file") {
+    const id = Number(d.upload), picked = [...t.files].map(f => ({ name: f.name, size: f.size }));
+    if (picked.length) {
+      mutate(() => { const e = session && session.role === "user" ? entryOf(session.uid) : null; if (!e || e.record.submitted || isClosed(round())) return; const an = e.record.answers[id] = e.record.answers[id] || {}; an.files = [...(an.files || []), ...picked]; });
+      ui.openQ = id; render(); say(`${picked.length}개 파일을 추가했습니다. 자동 저장되었습니다.`);
+    }
+    t.value = ""; return;
+  }
+  /* 판정 이유를 다 쓰고 입력창을 벗어나면 다음 문항 카드를 연다 (입력 중에는 화면을 다시 그리지 않는다) */
+  if (d.rv !== undefined && t.tagName === "TEXTAREA") {
+    const want = visibleQuestions(q => reviewDone(recOf(d.uid), q)).length;
+    if (want !== document.querySelectorAll("#content article.card").length) render();
+    return;
+  }
+  if (d.asg !== undefined && isAdmin()) {
+    if (t.checked) (ui.assignSel = ui.assignSel || new Set()).add(d.asg); else if (ui.assignSel) ui.assignSel.delete(d.asg);
+    const b = document.querySelector('[data-act="assign-save"]'); if (b) b.textContent = "저장 (" + ui.assignSel.size + "명)";
+    return;
+  }
+  if (d.filter) { ui.filter[d.filter] = t.value; render(); const n = document.querySelector(`[data-filter="${d.filter}"]`); if (n) n.focus(); return; }
+  if (d.assign !== undefined && isAdmin()) {
+    const uid = d.assign, rater = t.value;
+    const ok = mutate(() => { const e = entryOf(uid); if (!e || e.record.notified || rater === uid) return false; if (rater && !(userOf(rater) || {}).evaluator) return false; e.rater = rater; logAct(rater ? `평가자 배정: ${nameOf(rater)}` : "평가자 배정 해제", uid); return true; });
+    if (!ok) say("평가자를 바꿀 수 없는 상태입니다."); return;
+  }
+  if (d.evaluator !== undefined && isAdmin()) {
+    const id = d.evaluator, on = t.checked;
+    const used = store.rounds.reduce((n, r) => n + r.people.filter(p => p.rater === id).length, 0);
+    if (!on && used) { t.checked = true; say(`담당 교수 ${used}명이 배정되어 있어 평가자 권한을 해제할 수 없습니다. 먼저 ‘담당 교수 지정’에서 해제하거나 평가자를 바꾸세요.`); return; }
+    mutate(() => { const u = userOf(id); if (u) { u.evaluator = on; logAct(`평가자 권한 ${on ? "부여" : "해제"}: ${u.name}`); } }); return;
+  }
+  if (d.enroll !== undefined && isAdmin()) {
+    const id = d.enroll;
+    if (t.checked) { mutate(() => { if (!entryOf(id)) { round().people.push({ uid: id, rater: "", record: fresh() }); logAct("회차 대상자 등록", id); } }); return; }
+    const e = entryOf(id), started = e && (Object.keys(e.record.answers).length || e.record.submitted);
+    if (started) { const a = await ask({ title: `${nameOf(id)} 교수를 이번 회차에서 제외할까요?`, body: "작성된 응답·평가 기록이 삭제됩니다.", ok: "제외", danger: true }); if (!a) { t.checked = true; return; } }
+    mutate(() => { logAct("회차에서 제외", id); round().people = round().people.filter(p => p.uid !== id); }); return;
+  }
+  if (d.userField !== undefined && isAdmin()) {
+    const v = t.value.trim(); if (!v) { render(); say("값을 비울 수 없습니다."); return; }
+    mutate(() => { const u = userOf(d.id); if (u) { u[d.userField] = v; logAct(`구성원 정보 수정: ${u.name}`); } }, false); return;
+  }
+  if (t.id === "bulk-file" && t.files[0]) { const rd = new FileReader(); rd.onload = () => { el("bulk-text").value = String(rd.result || ""); say("파일 내용을 불러왔습니다. ‘일괄 등록’을 누르세요."); }; rd.readAsText(t.files[0], "utf-8"); return; }
+  if (t.id === "import-file" && t.files[0] && isAdmin()) {
+    const file = t.files[0]; t.value = "";
+    let data; try { data = JSON.parse(await file.text()); } catch { say("올바른 백업 파일이 아닙니다."); return; }
+    if (!data || data.v !== 6 || !Array.isArray(data.users) || !Array.isArray(data.rounds) || !data.rounds.length) { say("이 목업의 백업 파일 형식(v6, 4수준 척도)이 아닙니다. 이전 5수준 백업은 가져올 수 없습니다."); return; }
+    const a = await ask({ title: "백업 파일로 교체할까요?", body: `현재 데이터가 파일 내용(구성원 ${data.users.length}명, 회차 ${data.rounds.length}개)으로 교체됩니다.`, ok: "가져오기", danger: true });
+    if (!a) return;
+    mutate(() => { store = normalize(data); logAct("백업 파일 가져오기"); }); say("백업 파일을 가져왔습니다.");
+  }
+});
+
+render();
