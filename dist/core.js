@@ -83,7 +83,7 @@ function seed() {
     { id: "u-sample", loginId: "prof01", name: "김교수", school: "방송영상스쿨", evaluator: false },
     { id: "u-p2", loginId: "prof02", name: "박지연", school: "게임스쿨", evaluator: false },
     { id: "u-p3", loginId: "prof03", name: "최도현", school: "게임스쿨", evaluator: false },
-    { id: "u-p4", loginId: "prof04", name: "정수진", school: "방송영상스쿨", evaluator: false },
+    { id: "u-p4", loginId: "prof04", name: "홍길동", school: "방송영상스쿨", evaluator: false },
     { id: "u-rater", loginId: "eval01", name: "이평가", school: "방송영상스쿨", evaluator: true }
   ].map(u => ({ ...u, pw: makePw("demo1234"), must: false }));
   const kim = demoRecord("u-sample", 2, questions.length, "pull");

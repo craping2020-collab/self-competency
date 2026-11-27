@@ -25,7 +25,7 @@ srv.listen(0, async () => {
   // 메뉴 4개
   ok(nav().join(",") === "자가진단,진단결과,도움말,운영자기능", "메뉴 4개: " + nav().join(" / "));
   // 첫 화면 = 처음 시작하는 교원의 자가진단
-  ok($("#crumb").textContent === "자가진단" && T().includes("정수진 선생님") && $("#count-n").textContent.startsWith("0") && !!$(".howto"), "첫 화면: 처음 시작하는 교원(정수진 0/12) + 3단계 안내");
+  ok($("#crumb").textContent === "자가진단" && T().includes("홍길동 교수님") && $("#count-n").textContent.startsWith("0") && !!$(".howto"), "첫 화면: 처음 시작하는 교원(홍길동 0/12) + 3단계 안내");
   // 점진적 공개 ① 문항은 하나만 펼쳐짐
   ok(openCards() === 1 && $$(".qsum").length === 1, "문항 1개만 펼쳐짐, 나머지는 요약 행");
   // 점진적 공개 ② 처음에는 현재 수준만 — 카드를 누르면 설명·다음 행동 칸이 생성된다
@@ -64,7 +64,7 @@ srv.listen(0, async () => {
   await click('.subtab[data-go="agreement"]');
   ok(T().includes("행동기준 확인 ↔ 평가자 확인") && /\d+%/.test(T()), "측정 일치도: " + $$(".kpi .n").map(x => x.textContent).join(", "));
   await click('#nav [data-go="self"]');
-  ok($("#crumb").textContent === "자가진단" && T().includes("선생님"), "자가진단 메뉴로 교원 보기 복귀");
+  ok($("#crumb").textContent === "자가진단" && T().includes("교수님"), "자가진단 메뉴로 교원 보기 복귀");
 
   // 김교수: 제출 완료 상태
   { const f0 = $("#faculty-view"); f0.value = "u-sample"; f0.dispatchEvent(new w.Event("change", { bubbles: true })); await sleep(150); }
@@ -73,9 +73,9 @@ srv.listen(0, async () => {
   ok($$(".lv input:not(:disabled)").length === 0, "제출한 교원은 입력 잠금");
   // 최도현: 이미 입력한 문항
   { const f1 = $("#faculty-view"); f1.value = "u-p3"; f1.dispatchEvent(new w.Event("change", { bubbles: true })); await sleep(150); }
-  ok(T().includes("최도현 선생님") && radios("current") === 7 && radios("target") === 6 && !!$(".qmore") && $$(".lv-desc").length === 2, "이미 입력한 문항을 열면 현재·목표 설명과 행동기준 확인 칸이 모두 펼쳐져 있음");
+  ok(T().includes("최도현 교수님") && radios("current") === 7 && radios("target") === 6 && !!$(".qmore") && $$(".lv-desc").length === 2, "이미 입력한 문항을 열면 현재·목표 설명과 행동기준 확인 칸이 모두 펼쳐져 있음");
 
-  // 정수진: 12문항 완료 후 제출
+  // 홍길동: 12문항 완료 후 제출
   { const f2 = $("#faculty-view"); f2.value = "u-p4"; f2.dispatchEvent(new w.Event("change", { bubbles: true })); await sleep(150); }
   for (let di = 0; di < 6; di++) {
     await tab(di);

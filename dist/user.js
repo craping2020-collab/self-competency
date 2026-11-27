@@ -144,7 +144,7 @@ function selfPage() {
   }).join("");
   const bar = `<div class="actionbar"><div class="ab-left"><span class="saved">입력은 자동 저장됩니다</span><span class="ab-prog"><progress id="count-p" value="${count}" max="${questions.length}" aria-label="완료 문항"></progress><span id="ab-n">${count}/${questions.length} 완료</span></span></div><div class="ab-right"><button class="quiet" data-domain="${gi - 1}" ${gi === 0 ? "disabled" : ""}>← 이전 역량</button><button class="quiet" data-domain="${gi + 1}" ${gi >= domains.length - 1 ? "disabled" : ""}>다음 역량 →</button>${rec.submitted ? pill("제출 완료", "ok") : `<button class="primary" data-act="submit" ${closed ? "disabled" : ""}>자가진단 제출</button>`}</div></div>`;
   const me0 = userOf(uid) || {}, rd = round(), dd0 = rd.close ? dday(rd.close) : null;
-  const sub = `<b>${esc(me0.name)} 선생님</b> · ${esc(rd.name)}${dd0 ? ` · 응답 마감 ${esc(rd.close)} ${pill(closed ? "마감" : dd0.text, dd0.cls)}` : ""}`;
+  const sub = `<b>${esc(me0.name)} 교수님</b> · ${esc(rd.name)}${dd0 ? ` · 응답 마감 ${esc(rd.close)} ${pill(closed ? "마감" : dd0.text, dd0.cls)}` : ""}`;
   const html = warn + hero("자가진단", sub, count, questions.length) + `<div class="top-tools">${phaseBanner()}${demoSwitch(me0)}</div>` + (count < questions.length && !rec.submitted ? howto() : "") + tabs + `<div>${cards}</div>` + bar;
   ui.fresh = null; return html;
 }
